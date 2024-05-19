@@ -6,6 +6,9 @@ import pytz
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
 import os
+import openpyxl
+from openpyxl.styles import Font
+from openpyxl.utils import get_column_letter
 
 # Load environment variables from .env file
 load_dotenv()
@@ -33,6 +36,24 @@ def generate_unique_id(collection, date):
     date_str = date.strftime('%y%m%d')
     count = collection.count_documents({"unique_id": {"$regex": f"^{date_str}-"}}) + 1
     return f"{date_str}-{count:03d}"
+
+def generate_excel(filename, headers, data):
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+
+    for col_num, header in enumerate(headers, 1):
+        cell = sheet.cell(row=1, column=col_num)
+        cell.value = header
+        cell.font = Font(bold=True)
+
+    for row_num, row_data in enumerate(data, 2):
+        for col_num, cell_value in enumerate(row_data, 1):
+            sheet.cell(row=row_num, column=col_num, value=cell_value)
+
+    for col_num in range(1, len(headers) + 1):
+        sheet.column_dimensions[get_column_letter(col_num)].width = 20
+
+    workbook.save(filename)
 
 @bot.event
 async def on_ready():
@@ -156,5 +177,62 @@ async def list_work(ctx, start_date: str = None, end_date: str = None):
         embed.add_field(name=user, value=f"Total Hours: {total_hours:.2f}", inline=False)
 
     await ctx.send(embed=embed)
+
+@bot.slash_command(name="exportdata", description="Export work data to an Excel file")
+async def export_data(ctx, start_date: str, end_date: str):
+    guild_id = ctx.guild.id
+    collection = get_collection(guild_id)
+
+    try:
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=JST)
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=JST)
+        query = {"end_time": {"$gte": start_date, "$lt": end_date + timedelta(days=1)}}
+    except ValueError:
+        await ctx.send("Invalid date format. Use format: YYYY-MM-DD")
+        return
+
+    entries = list(collection.find(query))
+
+    data = []
+    for entry in entries:
+        if entry['end_time']:
+            start_time = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
+            end_time = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
+            total_hours = (entry['end_time'] - entry['start_time']).total_seconds() / 3600
+            data.append([entry['discord_name'], start_time, end_time, total_hours])
+
+    headers = ["Employee Name", "Start Time", "End Time", "Total Hours"]
+    filename = f"work_data_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx"
+    generate_excel(filename, headers, data)
+
+    await ctx.send(file=discord.File(filename))
+
+@bot.slash_command(name="exporttotal", description="Export total work hours to an Excel file")
+async def export_total(ctx, start_date: str, end_date: str):
+    guild_id = ctx.guild.id
+    collection = get_collection(guild_id)
+
+    try:
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=JST)
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=JST)
+        query = {"end_time": {"$gte": start_date, "$lt": end_date + timedelta(days=1)}}
+    except ValueError:
+        await ctx.send("Invalid date format. Use format: YYYY-MM-DD")
+        return
+
+    entries = list(collection.find(query))
+
+    user_hours = {}
+    for entry in entries:
+        if entry['end_time']:
+            user_hours.setdefault(entry['discord_name'], 0)
+            user_hours[entry['discord_name']] += (entry['end_time'] - entry['start_time']).total_seconds()
+
+    data = [[user, total_seconds / 3600] for user, total_seconds in user_hours.items()]
+    headers = ["Employee Name", "Total Hours"]
+    filename = f"total_hours_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx"
+    generate_excel(filename, headers, data)
+
+    await ctx.send(file=discord.File(filename))
 
 bot.run(os.getenv("DISCORD_BOT_TOKEN"))
