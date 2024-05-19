@@ -28,9 +28,9 @@ JST = pytz.timezone('Asia/Tokyo')
 def get_collection(guild_id):
     return db[str(guild_id)]
 
-def calculate_total_hours(entries):
+def calculate_total_minutes(entries):
     total_seconds = sum((entry['end_time'] - entry['start_time']).total_seconds() for entry in entries if entry['end_time'])
-    return total_seconds / 3600
+    return total_seconds / 60
 
 def generate_unique_id(collection, date):
     date_str = date.strftime('%y%m%d')
@@ -138,14 +138,14 @@ async def check_work(ctx):
     user_id = ctx.author.id
 
     entries = list(collection.find({"user_id": user_id}))
-    total_hours = calculate_total_hours(entries)
+    total_minutes = calculate_total_minutes(entries)
 
     embed = discord.Embed(title="Your Work Hours", color=discord.Color.gold())
     for entry in entries:
         start = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
         end = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
         embed.add_field(name=f"ID: {entry['unique_id']}", value=f"Start: {start}\nEnd: {end}", inline=False)
-    embed.add_field(name="Total Hours", value=f"{total_hours:.2f}", inline=False)
+    embed.add_field(name="Total Minutes", value=f"{total_minutes:.2f}", inline=False)
     await ctx.send(embed=embed)
 
 @bot.slash_command(name="list", description="List all work hours")
@@ -165,16 +165,16 @@ async def list_work(ctx, start_date: str = None, end_date: str = None):
 
     entries = list(collection.find(query))
 
-    user_hours = {}
+    user_minutes = {}
     for entry in entries:
         if entry['end_time']:
-            user_hours.setdefault(entry['discord_name'], 0)
-            user_hours[entry['discord_name']] += (entry['end_time'] - entry['start_time']).total_seconds()
+            user_minutes.setdefault(entry['discord_name'], 0)
+            user_minutes[entry['discord_name']] += (entry['end_time'] - entry['start_time']).total_seconds()
 
     embed = discord.Embed(title="All Users Work Hours", color=discord.Color.purple())
-    for user, total_seconds in user_hours.items():
-        total_hours = total_seconds / 3600
-        embed.add_field(name=user, value=f"Total Hours: {total_hours:.2f}", inline=False)
+    for user, total_seconds in user_minutes.items():
+        total_minutes = total_seconds / 60
+        embed.add_field(name=user, value=f"Total Minutes: {total_minutes:.2f}", inline=False)
 
     await ctx.send(embed=embed)
 
@@ -198,10 +198,10 @@ async def export_data(ctx, start_date: str, end_date: str):
         if entry['end_time']:
             start_time = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
             end_time = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
-            total_hours = (entry['end_time'] - entry['start_time']).total_seconds() / 3600
-            data.append([entry['discord_name'], start_time, end_time, total_hours])
+            total_minutes = (entry['end_time'] - entry['start_time']).total_seconds() / 60
+            data.append([entry['discord_name'], start_time, end_time, total_minutes])
 
-    headers = ["Employee Name", "Start Time", "End Time", "Total Hours"]
+    headers = ["Employee Name", "Start Time", "End Time", "Total Minutes"]
     filename = f"work_data_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx"
     generate_excel(filename, headers, data)
 
@@ -222,14 +222,14 @@ async def export_total(ctx, start_date: str, end_date: str):
 
     entries = list(collection.find(query))
 
-    user_hours = {}
+    user_minutes = {}
     for entry in entries:
         if entry['end_time']:
-            user_hours.setdefault(entry['discord_name'], 0)
-            user_hours[entry['discord_name']] += (entry['end_time'] - entry['start_time']).total_seconds()
+            user_minutes.setdefault(entry['discord_name'], 0)
+            user_minutes[entry['discord_name']] += (entry['end_time'] - entry['start_time']).total_seconds()
 
-    data = [[user, total_seconds / 3600] for user, total_seconds in user_hours.items()]
-    headers = ["Employee Name", "Total Hours"]
+    data = [[user, total_seconds / 60] for user, total_seconds in user_minutes.items()]
+    headers = ["Employee Name", "Total Minutes"]
     filename = f"total_hours_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx"
     generate_excel(filename, headers, data)
 
