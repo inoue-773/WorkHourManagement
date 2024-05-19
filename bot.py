@@ -30,7 +30,7 @@ def calculate_total_hours(entries):
     return total_seconds / 3600
 
 def generate_unique_id(collection, date):
-    date_str = date.strftime('%m%d')
+    date_str = date.strftime('%y%m%d')
     count = collection.count_documents({"unique_id": {"$regex": f"^{date_str}-"}}) + 1
     return f"{date_str}-{count:03d}"
 
@@ -40,6 +40,8 @@ async def on_ready():
 
 @bot.slash_command(name="start", description="Start working")
 async def start_work(ctx):
+    await ctx.defer()
+    
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
@@ -63,6 +65,8 @@ async def start_work(ctx):
 
 @bot.slash_command(name="end", description="End working")
 async def end_work(ctx):
+    await ctx.defer()
+    
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
@@ -81,6 +85,8 @@ async def end_work(ctx):
 
 @bot.slash_command(name="edit", description="Edit work hours")
 async def edit_work(ctx, unique_id: str = None, new_start: str = None, new_end: str = None):
+    await ctx.defer()
+    
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     if unique_id is None or new_start is None or new_end is None:
@@ -88,8 +94,8 @@ async def edit_work(ctx, unique_id: str = None, new_start: str = None, new_end: 
 
         embed = discord.Embed(title="Edit Work Hours", description="Here are your entries. Use /edit [unique_id] [new_start] [new_end] to edit an entry.", color=discord.Color.blue())
         for entry in entries:
-            start = entry['start_time'].strftime('%Y-%m-%d %H:%M')
-            end = entry['end_time'].strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
+            start = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
+            end = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
             embed.add_field(name=f"ID: {entry['unique_id']}", value=f"Start: {start}\nEnd: {end}", inline=False)
         
         await ctx.send(embed=embed)
@@ -112,6 +118,8 @@ async def edit_work(ctx, unique_id: str = None, new_start: str = None, new_end: 
 
 @bot.slash_command(name="check", description="Check your work hours")
 async def check_work(ctx):
+    await ctx.defer()
+    
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
@@ -121,14 +129,16 @@ async def check_work(ctx):
 
     embed = discord.Embed(title="Your Work Hours", color=discord.Color.gold())
     for entry in entries:
-        start = entry['start_time'].strftime('%Y-%m-%d %H:%M')
-        end = entry['end_time'].strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
+        start = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
+        end = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
         embed.add_field(name=f"ID: {entry['unique_id']}", value=f"Start: {start}\nEnd: {end}", inline=False)
     embed.add_field(name="Total Hours", value=f"{total_hours:.2f}", inline=False)
     await ctx.send(embed=embed)
 
 @bot.slash_command(name="list", description="List all work hours")
 async def list_work(ctx, start_date: str = None, end_date: str = None):
+    await ctx.defer()
+    
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     try:
