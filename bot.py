@@ -40,8 +40,6 @@ async def on_ready():
 
 @bot.slash_command(name="start", description="Start working")
 async def start_work(ctx):
-    await ctx.defer()
-    
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
@@ -65,8 +63,6 @@ async def start_work(ctx):
 
 @bot.slash_command(name="end", description="End working")
 async def end_work(ctx):
-    await ctx.defer()
-    
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
@@ -85,8 +81,6 @@ async def end_work(ctx):
 
 @bot.slash_command(name="edit", description="Edit work hours")
 async def edit_work(ctx, unique_id: str = None, new_start: str = None, new_end: str = None):
-    await ctx.defer()
-    
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     if unique_id is None or new_start is None or new_end is None:
@@ -118,8 +112,6 @@ async def edit_work(ctx, unique_id: str = None, new_start: str = None, new_end: 
 
 @bot.slash_command(name="check", description="Check your work hours")
 async def check_work(ctx):
-    await ctx.defer()
-    
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
@@ -137,8 +129,6 @@ async def check_work(ctx):
 
 @bot.slash_command(name="list", description="List all work hours")
 async def list_work(ctx, start_date: str = None, end_date: str = None):
-    await ctx.defer()
-    
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     try:
