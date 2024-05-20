@@ -61,6 +61,8 @@ async def on_ready():
 
 @bot.slash_command(name="start", description="Start working")
 async def start_work(ctx):
+    await ctx.respond(f"Welcome back {ctx.author.mention}! It is great to work with you.", ephemeral=True)
+
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
@@ -79,11 +81,13 @@ async def start_work(ctx):
     collection.insert_one(entry)
 
     embed = discord.Embed(title="Work Start", description=f"Work started at {start_time.strftime('%Y-%m-%d %H:%M')}", color=discord.Color.green())
-    embed.add_field(name="Entry ID", value=unique_id)
+    embed.add_field(name="Work session ID", value=unique_id)
     await ctx.respond(embed=embed)
 
 @bot.slash_command(name="end", description="End working")
 async def end_work(ctx):
+    await ctx.respond("Great work! Thank you so much for your hard work.", ephemeral=True)
+
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
@@ -97,11 +101,13 @@ async def end_work(ctx):
 
     collection.update_one({"_id": entry["_id"]}, {"$set": {"end_time": end_time}})
 
-    embed = discord.Embed(title="Work End", description=f"Work ended at {end_time.strftime('%Y-%m-%d %H:%M')}", color=discord.Color.red())
+    embed = discord.Embed(title="Work End", description=f"Great work {ctx.author.mention}!\n Work ended at {end_time.strftime('%Y-%m-%d %H:%M')}", color=discord.Color.red())
     await ctx.respond(embed=embed)
 
 @bot.slash_command(name="edit", description="Edit work hours")
 async def edit_work(ctx, unique_id: str = None, new_start: str = None, new_end: str = None):
+    await ctx.respond("Alright, let me change the database a little bit.....", ephemeral=True)
+
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     if unique_id is None or new_start is None or new_end is None:
@@ -133,14 +139,16 @@ async def edit_work(ctx, unique_id: str = None, new_start: str = None, new_end: 
 
 @bot.slash_command(name="check", description="Check your work hours")
 async def check_work(ctx):
+    await ctx.respond("Alright, here are the data:", ephemeral=True)
+
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
 
-    entries = list(collection.find({"user_id": user_id}))
+    entries = list(collection.find({"user_id": user_id}).sort("start_time", -1).limit(10))
     total_minutes = calculate_total_minutes(entries)
 
-    embed = discord.Embed(title="Your Work Hours", color=discord.Color.gold())
+    embed = discord.Embed(title="Your Recent Work Hours (Last 10 Entries)", color=discord.Color.gold())
     for entry in entries:
         start = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
         end = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
@@ -150,6 +158,8 @@ async def check_work(ctx):
 
 @bot.slash_command(name="list", description="List all work hours")
 async def list_work(ctx, start_date: str = None, end_date: str = None):
+    await ctx.respond("Ok, let me generate a long list......", ephemeral=True)
+
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     try:
@@ -180,6 +190,8 @@ async def list_work(ctx, start_date: str = None, end_date: str = None):
 
 @bot.slash_command(name="exportdata", description="Export work data to an Excel file")
 async def export_data(ctx, start_date: str, end_date: str):
+    await ctx.respond("Sure thing! Excel file is coming.....", ephemeral=True)
+
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
 
@@ -206,9 +218,12 @@ async def export_data(ctx, start_date: str, end_date: str):
     generate_excel(filename, headers, data)
 
     await ctx.respond(file=discord.File(filename))
+    os.remove(filename)  # Delete the file after sending
 
 @bot.slash_command(name="exporttotal", description="Export total work hours to an Excel file")
 async def export_total(ctx, start_date: str, end_date: str):
+    await ctx.respond("Sure thing! Excel file is coming.....", ephemeral=True)
+
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
 
@@ -234,5 +249,6 @@ async def export_total(ctx, start_date: str, end_date: str):
     generate_excel(filename, headers, data)
 
     await ctx.respond(file=discord.File(filename))
+    os.remove(filename)  # Delete the file after sending
 
 bot.run(os.getenv("DISCORD_BOT_TOKEN"))
