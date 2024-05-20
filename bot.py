@@ -82,14 +82,13 @@ async def start_work(ctx):
     }
     collection.insert_one(entry)
 
-    embed = discord.Embed(title="Work Start", description=f"Work started at {start_time.strftime('%Y-%m-%d %H:%M')}", color=discord.Color.green())
+    embed = discord.Embed(title="Work Start", description=f"Welcome back {ctx.user.mention}!/n Work started at {start_time.strftime('%Y-%m-%d %H:%M')}", color=discord.Color.green())
     embed.add_field(name="Work session ID", value=unique_id)
     embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
     await ctx.respond(embed=embed)
 
 @bot.slash_command(name="end", description="End working")
 async def end_work(ctx):
-    await ctx.respond("Great work! Thank you so much for your hard work.", ephemeral=True)
 
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
