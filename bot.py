@@ -64,7 +64,6 @@ async def on_ready():
 
 @bot.slash_command(name="start", description="Start working")
 async def start_work(ctx):
-    await ctx.respond(f"Welcome back {ctx.author.mention}! It is great to work with you.", ephemeral=True)
 
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
@@ -84,7 +83,8 @@ async def start_work(ctx):
     collection.insert_one(entry)
 
     embed = discord.Embed(title="Work Start", description=f"Work started at {start_time.strftime('%Y-%m-%d %H:%M')}", color=discord.Color.green())
-    embed.add_field(name="Entry ID", value=unique_id)
+    embed.add_field(name="Work session ID", value=unique_id)
+    embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
     await ctx.respond(embed=embed)
 
 @bot.slash_command(name="end", description="End working")
@@ -105,34 +105,36 @@ async def end_work(ctx):
     collection.update_one({"_id": entry["_id"]}, {"$set": {"end_time": end_time}})
 
     embed = discord.Embed(title="Work End", description=f"Great work {ctx.author.mention}!\n Work ended at {end_time.strftime('%Y-%m-%d %H:%M')}", color=discord.Color.red())
+    embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
     await ctx.respond(embed=embed)
 
 @bot.slash_command(name="edit", description="Edit work hours")
-async def edit_work(ctx, unique_id: str = None, new_start: str = None, new_end: str = None):
+async def edit_work(ctx, unique_id: str = None, start_time_new: str = None, end_time_new: str = None):
     await ctx.respond("Alright, let me change the database a little bit.....", ephemeral=True)
 
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
-    if unique_id is None or new_start is None or new_end is None:
+    if unique_id is None or start_time_new is None or end_time_new is None:
         entries = list(collection.find({"user_id": ctx.author.id}))
 
-        embed = discord.Embed(title="Edit Work Hours", description="Here are your entries. Use /edit [unique_id] [new_start] [new_end] to edit an entry.", color=discord.Color.blue())
+        embed = discord.Embed(title="Edit Work Hours", description="Here are your entries. Use /edit [unique_id] [start_time_new] [end_time_new] to edit an entry.", color=discord.Color.blue())
         for entry in entries:
             start = entry['start_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M')
             end = entry['end_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
             embed.add_field(name=f"ID: {entry['unique_id']}", value=f"Start: {start}\nEnd: {end}", inline=False)
+        embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
         
         await ctx.respond(embed=embed)
         return
 
     try:
-        new_start_time = datetime.strptime(new_start, '%Y-%m-%d %H:%M').replace(tzinfo=custom_tz)
-        new_end_time = datetime.strptime(new_end, '%Y-%m-%d %H:%M').replace(tzinfo=custom_tz)
+        new_start_time = datetime.strptime(start_time_new, '%Y-%m-%d %H:%M').replace(tzinfo=custom_tz)
+        new_end_time = datetime.strptime(end_time_new, '%Y-%m-%d %H:%M').replace(tzinfo=custom_tz)
     except ValueError:
         await ctx.respond("Invalid date format. Use format: YYYY-MM-DD HH:MM")
         return
 
-    result = collection.update_one({"unique_id": unique_id}, {"$set": {"start_time": new_start_time, "end_time": new_end_time}})
+    result = collection.update_one({"unique_id": unique_id}, {"$set": {"start_time": start_time_new, "end_time": end_time_new}})
     if result.modified_count == 0:
         await ctx.respond("No entry found with that ID.")
         return
@@ -142,7 +144,6 @@ async def edit_work(ctx, unique_id: str = None, new_start: str = None, new_end: 
 
 @bot.slash_command(name="check", description="Check your work hours")
 async def check_work(ctx):
-    await ctx.respond("Alright, here are the data:", ephemeral=True)
 
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
@@ -157,7 +158,8 @@ async def check_work(ctx):
         end = entry['end_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
         embed.add_field(name=f"ID: {entry['unique_id']}", value=f"Start: {start}\nEnd: {end}", inline=False)
     embed.add_field(name="Total Minutes", value=f"{total_minutes:.2f}", inline=False)
-    await ctx.respond(embed=embed)
+    embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
+    await ctx.respond(embed=embed, ephemeral=True)
 
 @bot.slash_command(name="list", description="List all work hours")
 async def list_work(ctx, start_date: str = None, end_date: str = None):
@@ -188,8 +190,9 @@ async def list_work(ctx, start_date: str = None, end_date: str = None):
     for user, total_seconds in user_minutes.items():
         total_minutes = total_seconds / 60
         embed.add_field(name=user, value=f"Total Minutes: {total_minutes:.2f}", inline=False)
+    embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
 
-    await ctx.respond(embed=embed)
+    await ctx.respond(embed=embed, ephemeral=True)
 
 @bot.slash_command(name="exportdata", description="Export work data to an Excel file")
 async def export_data(ctx, start_date: str, end_date: str):
