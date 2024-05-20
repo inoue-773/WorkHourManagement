@@ -80,7 +80,7 @@ async def start_work(ctx):
 
     embed = discord.Embed(title="Work Start", description=f"Work started at {start_time.strftime('%Y-%m-%d %H:%M')}", color=discord.Color.green())
     embed.add_field(name="Entry ID", value=unique_id)
-    await ctx.send(embed=embed)
+    await ctx.respond(embed=embed)
 
 @bot.slash_command(name="end", description="End working")
 async def end_work(ctx):
@@ -92,13 +92,13 @@ async def end_work(ctx):
     # Find the last entry without an end time
     entry = collection.find_one({"user_id": user_id, "end_time": None})
     if not entry:
-        await ctx.send("No work session to end.")
+        await ctx.respond("No work session to end.")
         return
 
     collection.update_one({"_id": entry["_id"]}, {"$set": {"end_time": end_time}})
 
     embed = discord.Embed(title="Work End", description=f"Work ended at {end_time.strftime('%Y-%m-%d %H:%M')}", color=discord.Color.red())
-    await ctx.send(embed=embed)
+    await ctx.respond(embed=embed)
 
 @bot.slash_command(name="edit", description="Edit work hours")
 async def edit_work(ctx, unique_id: str = None, new_start: str = None, new_end: str = None):
@@ -113,23 +113,23 @@ async def edit_work(ctx, unique_id: str = None, new_start: str = None, new_end: 
             end = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
             embed.add_field(name=f"ID: {entry['unique_id']}", value=f"Start: {start}\nEnd: {end}", inline=False)
         
-        await ctx.send(embed=embed)
+        await ctx.respond(embed=embed)
         return
 
     try:
         new_start_time = datetime.strptime(new_start, '%Y-%m-%d %H:%M').replace(tzinfo=JST)
         new_end_time = datetime.strptime(new_end, '%Y-%m-%d %H:%M').replace(tzinfo=JST)
     except ValueError:
-        await ctx.send("Invalid date format. Use format: YYYY-MM-DD HH:MM")
+        await ctx.respond("Invalid date format. Use format: YYYY-MM-DD HH:MM")
         return
 
     result = collection.update_one({"unique_id": unique_id}, {"$set": {"start_time": new_start_time, "end_time": new_end_time}})
     if result.modified_count == 0:
-        await ctx.send("No entry found with that ID.")
+        await ctx.respond("No entry found with that ID.")
         return
 
     embed = discord.Embed(title="Work Edited", description=f"Entry {unique_id} has been updated.", color=discord.Color.blue())
-    await ctx.send(embed=embed)
+    await ctx.respond(embed=embed)
 
 @bot.slash_command(name="check", description="Check your work hours")
 async def check_work(ctx):
@@ -146,7 +146,7 @@ async def check_work(ctx):
         end = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
         embed.add_field(name=f"ID: {entry['unique_id']}", value=f"Start: {start}\nEnd: {end}", inline=False)
     embed.add_field(name="Total Minutes", value=f"{total_minutes:.2f}", inline=False)
-    await ctx.send(embed=embed)
+    await ctx.respond(embed=embed)
 
 @bot.slash_command(name="list", description="List all work hours")
 async def list_work(ctx, start_date: str = None, end_date: str = None):
@@ -160,7 +160,7 @@ async def list_work(ctx, start_date: str = None, end_date: str = None):
         else:
             query = {}
     except ValueError:
-        await ctx.send("Invalid date format. Use format: YYYY-MM-DD")
+        await ctx.respond("Invalid date format. Use format: YYYY-MM-DD")
         return
 
     entries = list(collection.find(query))
@@ -176,7 +176,7 @@ async def list_work(ctx, start_date: str = None, end_date: str = None):
         total_minutes = total_seconds / 60
         embed.add_field(name=user, value=f"Total Minutes: {total_minutes:.2f}", inline=False)
 
-    await ctx.send(embed=embed)
+    await ctx.respond(embed=embed)
 
 @bot.slash_command(name="exportdata", description="Export work data to an Excel file")
 async def export_data(ctx, start_date: str, end_date: str):
@@ -188,7 +188,7 @@ async def export_data(ctx, start_date: str, end_date: str):
         end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=JST)
         query = {"end_time": {"$gte": start_date, "$lt": end_date + timedelta(days=1)}}
     except ValueError:
-        await ctx.send("Invalid date format. Use format: YYYY-MM-DD")
+        await ctx.respond("Invalid date format. Use format: YYYY-MM-DD")
         return
 
     entries = list(collection.find(query))
@@ -205,7 +205,7 @@ async def export_data(ctx, start_date: str, end_date: str):
     filename = f"work_data_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx"
     generate_excel(filename, headers, data)
 
-    await ctx.send(file=discord.File(filename))
+    await ctx.respond(file=discord.File(filename))
 
 @bot.slash_command(name="exporttotal", description="Export total work hours to an Excel file")
 async def export_total(ctx, start_date: str, end_date: str):
@@ -217,7 +217,7 @@ async def export_total(ctx, start_date: str, end_date: str):
         end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=JST)
         query = {"end_time": {"$gte": start_date, "$lt": end_date + timedelta(days=1)}}
     except ValueError:
-        await ctx.send("Invalid date format. Use format: YYYY-MM-DD")
+        await ctx.respond("Invalid date format. Use format: YYYY-MM-DD")
         return
 
     entries = list(collection.find(query))
@@ -233,6 +233,6 @@ async def export_total(ctx, start_date: str, end_date: str):
     filename = f"total_hours_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx"
     generate_excel(filename, headers, data)
 
-    await ctx.send(file=discord.File(filename))
+    await ctx.respond(file=discord.File(filename))
 
 bot.run(os.getenv("DISCORD_BOT_TOKEN"))
