@@ -82,7 +82,7 @@ async def start_work(ctx):
     }
     collection.insert_one(entry)
 
-    embed = discord.Embed(title="Work Start", description=f"Welcome back {ctx.user.mention}!/n Work started at {start_time.strftime('%Y-%m-%d %H:%M')}", color=discord.Color.green())
+    embed = discord.Embed(title="Work Start", description=f"Welcome back {ctx.user.mention}!\n Work started at {start_time.strftime('%Y-%m-%d %H:%M')}", color=discord.Color.green())
     embed.add_field(name="Work session ID", value=unique_id)
     embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
     await ctx.respond(embed=embed)
@@ -162,7 +162,6 @@ async def check_work(ctx):
 
 @bot.slash_command(name="list", description="List all work hours")
 async def list_work(ctx, start_date: str = None, end_date: str = None):
-    await ctx.respond("Ok, let me generate a long list......", ephemeral=True)
 
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
