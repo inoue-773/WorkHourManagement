@@ -3,6 +3,7 @@ from discord.ext import commands
 from pymongo import MongoClient
 from datetime import datetime, timedelta
 import pytz
+from dateutil import tz
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
 import os
@@ -22,8 +23,10 @@ db = client["working_hours_db"]
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix='/', intents=intents)
 
-# Define JST timezone
-JST = pytz.timezone('Asia/Tokyo')
+# Define timezone from environment variable
+TIMEZONE = os.getenv("TIMEZONE")
+TIMEZONE_OFFSET = f"Etc/GMT{TIMEZONE.replace(':', '')}"
+custom_tz = tz.gettz(TIMEZONE_OFFSET)
 
 def get_collection(guild_id):
     return db[str(guild_id)]
@@ -67,7 +70,7 @@ async def start_work(ctx):
     collection = get_collection(guild_id)
     user_id = ctx.author.id
     discord_name = str(ctx.author)
-    start_time = datetime.now(JST)
+    start_time = datetime.now(tz=custom_tz)
     unique_id = generate_unique_id(collection, start_time)
 
     # Create a new entry in MongoDB
@@ -81,7 +84,7 @@ async def start_work(ctx):
     collection.insert_one(entry)
 
     embed = discord.Embed(title="Work Start", description=f"Work started at {start_time.strftime('%Y-%m-%d %H:%M')}", color=discord.Color.green())
-    embed.add_field(name="Work session ID", value=unique_id)
+    embed.add_field(name="Entry ID", value=unique_id)
     await ctx.respond(embed=embed)
 
 @bot.slash_command(name="end", description="End working")
@@ -91,7 +94,7 @@ async def end_work(ctx):
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
-    end_time = datetime.now(JST)
+    end_time = datetime.now(tz=custom_tz)
 
     # Find the last entry without an end time
     entry = collection.find_one({"user_id": user_id, "end_time": None})
@@ -115,16 +118,16 @@ async def edit_work(ctx, unique_id: str = None, new_start: str = None, new_end: 
 
         embed = discord.Embed(title="Edit Work Hours", description="Here are your entries. Use /edit [unique_id] [new_start] [new_end] to edit an entry.", color=discord.Color.blue())
         for entry in entries:
-            start = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
-            end = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
+            start = entry['start_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M')
+            end = entry['end_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
             embed.add_field(name=f"ID: {entry['unique_id']}", value=f"Start: {start}\nEnd: {end}", inline=False)
         
         await ctx.respond(embed=embed)
         return
 
     try:
-        new_start_time = datetime.strptime(new_start, '%Y-%m-%d %H:%M').replace(tzinfo=JST)
-        new_end_time = datetime.strptime(new_end, '%Y-%m-%d %H:%M').replace(tzinfo=JST)
+        new_start_time = datetime.strptime(new_start, '%Y-%m-%d %H:%M').replace(tzinfo=custom_tz)
+        new_end_time = datetime.strptime(new_end, '%Y-%m-%d %H:%M').replace(tzinfo=custom_tz)
     except ValueError:
         await ctx.respond("Invalid date format. Use format: YYYY-MM-DD HH:MM")
         return
@@ -150,8 +153,8 @@ async def check_work(ctx):
 
     embed = discord.Embed(title="Your Recent Work Hours (Last 10 Entries)", color=discord.Color.gold())
     for entry in entries:
-        start = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
-        end = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
+        start = entry['start_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M')
+        end = entry['end_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
         embed.add_field(name=f"ID: {entry['unique_id']}", value=f"Start: {start}\nEnd: {end}", inline=False)
     embed.add_field(name="Total Minutes", value=f"{total_minutes:.2f}", inline=False)
     await ctx.respond(embed=embed)
@@ -164,8 +167,8 @@ async def list_work(ctx, start_date: str = None, end_date: str = None):
     collection = get_collection(guild_id)
     try:
         if start_date and end_date:
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=JST)
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=JST)
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=custom_tz)
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=custom_tz)
             query = {"end_time": {"$gte": start_date, "$lt": end_date + timedelta(days=1)}}
         else:
             query = {}
@@ -196,8 +199,8 @@ async def export_data(ctx, start_date: str, end_date: str):
     collection = get_collection(guild_id)
 
     try:
-        start_date = datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=JST)
-        end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=JST)
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=custom_tz)
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=custom_tz)
         query = {"end_time": {"$gte": start_date, "$lt": end_date + timedelta(days=1)}}
     except ValueError:
         await ctx.respond("Invalid date format. Use format: YYYY-MM-DD")
@@ -208,8 +211,8 @@ async def export_data(ctx, start_date: str, end_date: str):
     data = []
     for entry in entries:
         if entry['end_time']:
-            start_time = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
-            end_time = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
+            start_time = entry['start_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M')
+            end_time = entry['end_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M')
             total_minutes = (entry['end_time'] - entry['start_time']).total_seconds() / 60
             data.append([entry['discord_name'], start_time, end_time, total_minutes])
 
@@ -228,8 +231,8 @@ async def export_total(ctx, start_date: str, end_date: str):
     collection = get_collection(guild_id)
 
     try:
-        start_date = datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=JST)
-        end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=JST)
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').replace(tzinfo=custom_tz)
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(tzinfo=custom_tz)
         query = {"end_time": {"$gte": start_date, "$lt": end_date + timedelta(days=1)}}
     except ValueError:
         await ctx.respond("Invalid date format. Use format: YYYY-MM-DD")
