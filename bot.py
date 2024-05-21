@@ -113,40 +113,38 @@ async def edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指
     if unique_id is None or new_start is None or new_end is None:
         entries = list(collection.find({"user_id": ctx.author.id}))
 
-        embed = discord.Embed(title="出勤時間・退勤時間を修正", description="Here are your entries. Use /edit [unique_id] [new_start] [new_end] to edit an entry.", color=discord.Color.blue())
+        embed = discord.Embed(title="出勤時間・退勤時間の修正", description="出勤時間と退勤時間の修正を行いました。", color=discord.Color.blue())
         for entry in entries:
-            start = entry['start_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M')
-            end = entry['end_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
-            embed.add_field(name=f"ID: {entry['unique_id']}", value=f"Start: {start}\nEnd: {end}", inline=False)
-            embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
+            start = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
+            end = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
+            embed.add_field(name=f"出勤データID: {entry['unique_id']}", value=f"出勤時間: {start}\n退勤時間: {end}", inline=False)
         
         await ctx.respond(embed=embed)
         return
 
     try:
-        new_start_time = datetime.strptime(new_start, '%Y-%m-%d %H:%M').replace(tzinfo=custom_tz)
-        new_end_time = datetime.strptime(new_end, '%Y-%m-%d %H:%M').replace(tzinfo=custom_tz)
+        new_start_time = datetime.strptime(new_start, '%Y-%m-%d %H:%M').replace(tzinfo=JST)
+        new_end_time = datetime.strptime(new_end, '%Y-%m-%d %H:%M').replace(tzinfo=JST)
     except ValueError:
-        await ctx.respond("日付と時刻のフォーマットが違います 例: 2024-01-01 0:00", ephemeral=True)
+        await ctx.respond("日付と時間の形式が違います 例: 2024-01-01 0:00")
         return
 
     entry = collection.find_one({"unique_id": unique_id})
     if not entry:
-        await ctx.respond("このIDは存在しません", ephemeral=True)
+        await ctx.respond("そのIDは存在しません")
         return
 
-    old_start_time = entry['start_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M')
-    old_end_time = entry['end_time'].astimezone(custom_tz).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
+    old_start_time = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
+    old_end_time = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
 
     collection.update_one({"unique_id": unique_id}, {"$set": {"start_time": new_start_time, "end_time": new_end_time}})
 
-    embed = discord.Embed(title="出勤データを編集しました", description=f"ID {unique_id} のデータを編集しました", color=discord.Color.blue())
+    embed = discord.Embed(title="出勤データを修正しました", description=f"ID: {unique_id} のデータを修正しました", color=discord.Color.blue())
     embed.add_field(name="スタッフ", value=f"{entry['discord_name']}", inline=False)
-    embed.add_field(name="変更前の出勤時間", value=old_start_time, inline=True)
-    embed.add_field(name="変更前の退勤時間", value=old_end_time, inline=True)
-    embed.add_field(name="変更後の出勤時間", value=new_start_time.strftime('%Y-%m-%d %H:%M'), inline=True)
-    embed.add_field(name="変更後の退勤時間", value=new_end_time.strftime('%Y-%m-%d %H:%M'), inline=True)
-    embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
+    embed.add_field(name="修正前の出勤時間", value=old_start_time, inline=True)
+    embed.add_field(name="修正前の退勤時間", value=old_end_time, inline=True)
+    embed.add_field(name="修正後の出勤時間", value=new_start_time.strftime('%Y-%m-%d %H:%M'), inline=True)
+    embed.add_field(name="修正前の退勤時間", value=new_end_time.strftime('%Y-%m-%d %H:%M'), inline=True)
 
     await ctx.respond(embed=embed)
 
@@ -192,10 +190,10 @@ async def list_work(ctx, start_date: discord.Option(str, "日付と時刻の範�
             user_minutes.setdefault(entry['discord_name'], 0)
             user_minutes[entry['discord_name']] += (entry['end_time'] - entry['start_time']).total_seconds()
 
-    embed = discord.Embed(title="All Users Work Hours", color=discord.Color.purple())
+    embed = discord.Embed(title="各従業員の出勤時間(分)", color=discord.Color.purple())
     for user, total_seconds in user_minutes.items():
         total_minutes = total_seconds / 60
-        embed.add_field(name=user, value=f"Total Minutes: {total_minutes:.2f}", inline=False)
+        embed.add_field(name=user, value=f"合計出勤時間(分): {total_minutes:.2f}", inline=False)
 
     await ctx.respond(embed=embed, ephemeral=True)
 
