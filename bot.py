@@ -106,7 +106,7 @@ async def end_work(ctx):
     await ctx.respond(embed=embed)
 
 @bot.slash_command(name="shuusei", description="出勤時間・退勤時間を修正")
-async def edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指定", required = True) = None, new_start: discord.Option(str, "新しい勤務開始時間 例: 2024-01-01 0:00", required = True) = None, new_end: discord.Option(str, "新しい退勤時間 例: 2024-01-02 0:00", required = True) = None):
+async def edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指定", required = True), new_start: discord.Option(str, "新しい勤務開始時間 例: 2024-01-01 0:00", required = True), new_end: discord.Option(str, "新しい退勤時間 例: 2024-01-02 0:00", required = True)):
 
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
@@ -167,7 +167,7 @@ async def check_work(ctx):
     await ctx.respond(embed=embed, ephemeral=True)
 
 @bot.slash_command(name="list", description="日付の範囲を指定して、期間内の従業員の出勤時間を算出")
-async def list_work(ctx, start_date: discord.Option(str, "日付と時刻の範囲指定 例:2024-01-01 12:00", required = True) = None, end_date: discord.Option(str, "日付と時刻の範囲指定 例:2024-01-01 17:00", required = True) = None):
+async def list_work(ctx, start_date: discord.Option(str, "日付と時刻の範囲指定 例:2024-01-01 12:00", required = True), end_date: discord.Option(str, "日付と時刻の範囲指定 例:2024-01-01 17:00", required = True)):
 
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
@@ -199,7 +199,7 @@ async def list_work(ctx, start_date: discord.Option(str, "日付と時刻の範�
 
 @bot.slash_command(name="exportdata", description="個別の出勤データをエクセルファイルに出力")
 async def export_data(ctx, start_date: discord.Option(str, "日付と時刻の範囲指定 例:2024-01-01 12:00", required = True), end_date: discord.Option(str, "日付と時刻の範囲指定 例:2024-01-01 17:00", required = True)):
-    await ctx.respond("Sure thing! Excel file is coming.....")
+    await ctx.respond("エクセルファイルを準備しています...")
 
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
@@ -231,7 +231,7 @@ async def export_data(ctx, start_date: discord.Option(str, "日付と時刻の�
 
 @bot.slash_command(name="exporttotal", description="各従業員の総出勤時間(分)をエクセルファイルに出力")
 async def export_total(ctx, start_date: discord.Option(str, "日付と時刻の範囲指定 例:2024-01-01 12:00", required = True), end_date: discord.Option(str, "日付と時刻の範囲指定 例:2024-01-01 17:00", required = True)):
-    await ctx.respond("Sure thing! Excel file is coming.....", ephemeral=True)
+    await ctx.respond("エクセルファイルを準備しています...", ephemeral=True)
 
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
