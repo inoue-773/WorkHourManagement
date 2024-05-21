@@ -145,6 +145,8 @@ async def edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指
     embed.add_field(name="修正前の退勤時間", value=old_end_time, inline=True)
     embed.add_field(name="修正後の出勤時間", value=new_start_time.strftime('%Y-%m-%d %H:%M'), inline=True)
     embed.add_field(name="修正前の退勤時間", value=new_end_time.strftime('%Y-%m-%d %H:%M'), inline=True)
+    embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
+    
 
     await ctx.respond(embed=embed)
 
