@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from pymongo import MongoClient
 from datetime import datetime, timedelta
 import pytz
@@ -58,17 +58,22 @@ def generate_excel(filename, headers, data):
 @bot.event
 async def on_ready():
     print(f'Bot is ready. Logged in as {bot.user}')
+    check_work_sessions.start()
 
 @bot.slash_command(name="shukkin", description="出勤する")
 async def start_work(ctx):
-
-
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
     discord_name = str(ctx.author)
     start_time = datetime.now(JST)
     unique_id = generate_unique_id(collection, start_time)
+
+    # Check for an existing active work session
+    existing_entry = collection.find_one({"user_id": user_id, "end_time": None})
+    if existing_entry:
+        await ctx.respond("既に出勤しています", ephemeral=True)
+        return
 
     # Create a new entry in MongoDB
     entry = {
@@ -80,14 +85,13 @@ async def start_work(ctx):
     }
     collection.insert_one(entry)
 
-    embed = discord.Embed(title="出勤を開始しました", description=f" {ctx.user.mention} さんおかえりなさい！\n {start_time.strftime('%Y-%m-%d %H:%M')} に勤務を開始しました", color=discord.Color.green())
+    embed = discord.Embed(title="出勤を開始しました", description=f"{ctx.user.mention} さんおかえりなさい！\n {start_time.strftime('%Y-%m-%d %H:%M')} に勤務を開始しました", color=discord.Color.green())
     embed.add_field(name="勤務データID", value=unique_id)
     embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
     await ctx.respond(embed=embed)
 
 @bot.slash_command(name="taikin", description="退勤する")
 async def end_work(ctx):
-
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
@@ -105,9 +109,21 @@ async def end_work(ctx):
     embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
     await ctx.respond(embed=embed)
 
-@bot.slash_command(name="shuusei", description="出勤時間・退勤時間を修正")
-async def edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指定", required = True), new_start: discord.Option(str, "新しい勤務開始時間 例: 2024-01-01 0:00", required = True), new_end: discord.Option(str, "新しい退勤時間 例: 2024-01-02 0:00", required = True)):
+@tasks.loop(minutes=10)
+async def check_work_sessions():
+    now = datetime.now(JST)
+    threshold = now - timedelta(hours=10)
 
+    for guild in bot.guilds:
+        collection = get_collection(guild.id)
+        active_entries = collection.find({"end_time": None, "start_time": {"$lte": threshold}})
+        for entry in active_entries:
+            user = guild.get_member(entry["user_id"])
+            if user:
+                await user.send(f"ちょっとちょっと、{entry['start_time'].strftime('%Y-%m-%d %H:%M')}に開始した出勤がまだ続いてるよ！働きすぎには注意してね！もし退勤し忘れてたら/taikinと/shuuseiで退勤時間を調整してね！")
+
+@bot.slash_command(name="shuusei", description="出勤時間・退勤時間を修正")
+async def edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指定", required=True), new_start: discord.Option(str, "新しい勤務開始時間 例: 2024-01-01 0:00", required=True), new_end: discord.Option(str, "新しい退勤時間 例: 2024-01-02 0:00", required=True)):
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     if unique_id is None or new_start is None or new_end is None:
@@ -118,7 +134,7 @@ async def edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指
             start = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
             end = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
             embed.add_field(name=f"出勤データID: {entry['unique_id']}", value=f"出勤時間: {start}\n退勤時間: {end}", inline=False)
-        
+
         await ctx.respond(embed=embed)
         return
 
@@ -146,13 +162,11 @@ async def edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指
     embed.add_field(name="修正後の出勤時間", value=new_start_time.strftime('%Y-%m-%d %H:%M'), inline=True)
     embed.add_field(name="修正前の退勤時間", value=new_end_time.strftime('%Y-%m-%d %H:%M'), inline=True)
     embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
-    
 
     await ctx.respond(embed=embed)
 
 @bot.slash_command(name="kakunin", description="出勤データを確認")
 async def check_work(ctx):
-
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     user_id = ctx.author.id
@@ -169,8 +183,7 @@ async def check_work(ctx):
     await ctx.respond(embed=embed, ephemeral=True)
 
 @bot.slash_command(name="list", description="日付の範囲を指定して、期間内の従業員の出勤時間を算出")
-async def list_work(ctx, start_date: discord.Option(str, "日付の範囲指定 例:2024-01-01", required = True), end_date: discord.Option(str, "日付の範囲指定 例:2024-01-01", required = True)):
-
+async def list_work(ctx, start_date: discord.Option(str, "日付の範囲指定 例:2024-01-01", required=True), end_date: discord.Option(str, "日付の範囲指定 例:2024-01-01", required=True)):
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
     try:
@@ -200,7 +213,7 @@ async def list_work(ctx, start_date: discord.Option(str, "日付の範囲指定 
     await ctx.respond(embed=embed, ephemeral=True)
 
 @bot.slash_command(name="exportdata", description="個別の出勤データをエクセルファイルに出力")
-async def export_data(ctx, start_date: discord.Option(str, "日付の範囲指定 例:2024-01-01", required = True), end_date: discord.Option(str, "日付の範囲指定 例:2024-01-02", required = True)):
+async def export_data(ctx, start_date: discord.Option(str, "日付の範囲指定 例:2024-01-01", required=True), end_date: discord.Option(str, "日付の範囲指定 例:2024-01-02", required=True)):
     await ctx.respond("エクセルファイルを準備しています...")
 
     guild_id = ctx.guild.id
@@ -232,7 +245,7 @@ async def export_data(ctx, start_date: discord.Option(str, "日付の範囲指�
     os.remove(filename)  # Delete the file after sending
 
 @bot.slash_command(name="exporttotal", description="各従業員の総出勤時間(分)をエクセルファイルに出力")
-async def export_total(ctx, start_date: discord.Option(str, "日付と時刻の範囲指定 例:2024-01-01", required = True), end_date: discord.Option(str, "日付と時刻の範囲指定 例:2024-01-01", required = True)):
+async def export_total(ctx, start_date: discord.Option(str, "日付と時刻の範囲指定 例:2024-01-01", required=True), end_date: discord.Option(str, "日付と時刻の範囲指定 例:2024-01-01", required=True)):
     await ctx.respond("エクセルファイルを準備しています...", ephemeral=True)
 
     guild_id = ctx.guild.id
