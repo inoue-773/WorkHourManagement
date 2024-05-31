@@ -72,7 +72,7 @@ async def start_work(ctx):
     # Check for an existing active work session
     existing_entry = collection.find_one({"user_id": user_id, "end_time": None})
     if existing_entry:
-        await ctx.respond("既に出勤しています", ephemeral=True)
+        await ctx.respond("You already have an active work session.")
         return
 
     # Create a new entry in MongoDB
@@ -120,22 +120,20 @@ async def check_work_sessions():
         for entry in active_entries:
             user = guild.get_member(entry["user_id"])
             if user:
-                await user.send(f"ちょっとちょっと、{entry['start_time'].strftime('%Y-%m-%d %H:%M')}に開始した出勤がまだ続いてるよ！働きすぎには注意してね！もし退勤し忘れてたら/taikinと/shuuseiで退勤時間を調整してね！")
+                await user.send(f"Your work session started at {entry['start_time'].strftime('%Y-%m-%d %H:%M')} has exceeded 10 hours. Please remember to end it using /taikin.")
 
 @bot.slash_command(name="shuusei", description="出勤時間・退勤時間を修正")
 async def edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指定", required=True), new_start: discord.Option(str, "新しい勤務開始時間 例: 2024-01-01 0:00", required=True), new_end: discord.Option(str, "新しい退勤時間 例: 2024-01-02 0:00", required=True)):
     guild_id = ctx.guild.id
     collection = get_collection(guild_id)
-    if unique_id is None or new_start is None or new_end is None:
-        entries = list(collection.find({"user_id": ctx.author.id}))
-
-        embed = discord.Embed(title="出勤時間・退勤時間の修正", description="出勤時間と退勤時間の修正を行いました。", color=discord.Color.blue())
-        for entry in entries:
-            start = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
-            end = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
-            embed.add_field(name=f"出勤データID: {entry['unique_id']}", value=f"出勤時間: {start}\n退勤時間: {end}", inline=False)
-
-        await ctx.respond(embed=embed)
+    
+    entry = collection.find_one({"unique_id": unique_id})
+    if not entry:
+        await ctx.respond("そのIDは存在しません")
+        return
+    
+    if entry['user_id'] != ctx.author.id:
+        await ctx.respond("他人の出勤データは編集できません", ephemeral=True)
         return
 
     try:
@@ -143,11 +141,6 @@ async def edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指
         new_end_time = datetime.strptime(new_end, '%Y-%m-%d %H:%M').replace(tzinfo=JST)
     except ValueError:
         await ctx.respond("日付と時間の形式が違います 例: 2024-01-01 0:00")
-        return
-
-    entry = collection.find_one({"unique_id": unique_id})
-    if not entry:
-        await ctx.respond("そのIDは存在しません")
         return
 
     old_start_time = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
@@ -160,7 +153,58 @@ async def edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指
     embed.add_field(name="修正前の出勤時間", value=old_start_time, inline=True)
     embed.add_field(name="修正前の退勤時間", value=old_end_time, inline=True)
     embed.add_field(name="修正後の出勤時間", value=new_start_time.strftime('%Y-%m-%d %H:%M'), inline=True)
-    embed.add_field(name="修正前の退勤時間", value=new_end_time.strftime('%Y-%m-%d %H:%M'), inline=True)
+    embed.add_field(name="修正後の退勤時間", value=new_end_time.strftime('%Y-%m-%d %H:%M'), inline=True)
+    embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
+
+    await ctx.respond(embed=embed)
+
+@bot.slash_command(name="admintaikin", description="強制的に退勤させる")
+@commands.has_permissions(administrator=True)
+async def admin_end_work(ctx, unique_id: discord.Option(str, "勤務データIDを指定", required=True)):
+    guild_id = ctx.guild.id
+    collection = get_collection(guild_id)
+    end_time = datetime.now(JST)
+
+    entry = collection.find_one({"unique_id": unique_id, "end_time": None})
+    if not entry:
+        await ctx.respond("No active work session found with the given ID.")
+        return
+
+    collection.update_one({"unique_id": unique_id}, {"$set": {"end_time": end_time}})
+
+    embed = discord.Embed(title="強制退勤しました", description=f"ID: {unique_id} の勤務データが強制的に退勤されました", color=discord.Color.red())
+    embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
+    await ctx.respond(embed=embed)
+
+@bot.slash_command(name="adminshuusei", description="強制的に出勤時間・退勤時間を修正")
+@commands.has_permissions(administrator=True)
+async def admin_edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指定", required=True), new_start: discord.Option(str, "新しい勤務開始時間 例: 2024-01-01 0:00", required=True), new_end: discord.Option(str, "新しい退勤時間 例: 2024-01-02 0:00", required=True)):
+    guild_id = ctx.guild.id
+    collection = get_collection(guild_id)
+    
+    entry = collection.find_one({"unique_id": unique_id})
+    if not entry:
+        await ctx.respond("そのIDは存在しません")
+        return
+
+    try:
+        new_start_time = datetime.strptime(new_start, '%Y-%m-%d %H:%M').replace(tzinfo=JST)
+        new_end_time = datetime.strptime(new_end, '%Y-%m-%d %H:%M').replace(tzinfo=JST)
+    except ValueError:
+        await ctx.respond("日付と時間の形式が違います 例: 2024-01-01 0:00")
+        return
+
+    old_start_time = entry['start_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M')
+    old_end_time = entry['end_time'].astimezone(JST).strftime('%Y-%m-%d %H:%M') if entry['end_time'] else "Ongoing"
+
+    collection.update_one({"unique_id": unique_id}, {"$set": {"start_time": new_start_time, "end_time": new_end_time}})
+
+    embed = discord.Embed(title="強制的に出勤データを修正しました", description=f"ID: {unique_id} のデータを修正しました", color=discord.Color.blue())
+    embed.add_field(name="スタッフ", value=f"{entry['discord_name']}", inline=False)
+    embed.add_field(name="修正前の出勤時間", value=old_start_time, inline=True)
+    embed.add_field(name="修正前の退勤時間", value=old_end_time, inline=True)
+    embed.add_field(name="修正後の出勤時間", value=new_start_time.strftime('%Y-%m-%d %H:%M'), inline=True)
+    embed.add_field(name="修正後の退勤時間", value=new_end_time.strftime('%Y-%m-%d %H:%M'), inline=True)
     embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
 
     await ctx.respond(embed=embed)
