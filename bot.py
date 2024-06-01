@@ -72,7 +72,7 @@ async def start_work(ctx):
     # Check for an existing active work session
     existing_entry = collection.find_one({"user_id": user_id, "end_time": None})
     if existing_entry:
-        await ctx.respond("You already have an active work session.")
+        await ctx.respond("既に出勤しています", ephemeral=True)
         return
 
     # Create a new entry in MongoDB
@@ -109,7 +109,7 @@ async def end_work(ctx):
     embed.set_footer(text="Powered by NickyBoy", icon_url="https://i.imgur.com/QfmDKS6.png")
     await ctx.respond(embed=embed)
 
-@tasks.loop(minutes=10)
+@tasks.loop(minutes=60)
 async def check_work_sessions():
     now = datetime.now(JST)
     threshold = now - timedelta(hours=10)
@@ -120,7 +120,7 @@ async def check_work_sessions():
         for entry in active_entries:
             user = guild.get_member(entry["user_id"])
             if user:
-                await user.send(f"Your work session started at {entry['start_time'].strftime('%Y-%m-%d %H:%M')} has exceeded 10 hours. Please remember to end it using /taikin.")
+                await user.send(f"あなたは{entry['start_time'].strftime('%Y-%m-%d %H:%M')}からずっと出勤していますが、退勤し忘れていませんか？働きすぎず適度に退勤してくださいね。")
 
 @bot.slash_command(name="shuusei", description="出勤時間・退勤時間を修正")
 async def edit_work(ctx, unique_id: discord.Option(str, "勤務データIDを指定", required=True), new_start: discord.Option(str, "新しい勤務開始時間 例: 2024-01-01 0:00", required=True), new_end: discord.Option(str, "新しい退勤時間 例: 2024-01-02 0:00", required=True)):
